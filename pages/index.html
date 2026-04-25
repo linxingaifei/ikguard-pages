@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ikguard GitHub 管理端</title>
+  <meta name="description" content="ikguard 的 GitHub Pages 静态管理端，用于读取、验签和签发 license.json。">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="bg"></div>
+  <main class="shell">
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="kicker">GitHub Pages / Actions</div>
+        <h1>ikguard 授权管理端</h1>
+        <p>
+          这是一个纯静态页面。它通过 GitHub API 读取 <code>licenses/license.json</code>，
+          用内置公钥在浏览器里验签，并可触发 GitHub Actions 重新签发授信文件。
+        </p>
+      </div>
+      <div class="hero-panel">
+        <div class="stat">
+          <span class="label">当前状态</span>
+          <strong id="stateBadge">未连接</strong>
+        </div>
+        <div class="stat">
+          <span class="label">验签结果</span>
+          <strong id="verifyBadge">待验证</strong>
+        </div>
+        <div class="stat">
+          <span class="label">最后动作</span>
+          <strong id="lastAction">无</strong>
+        </div>
+        <p class="muted note">
+          说明：GitHub Pages 站点通常是公开可访问的。token 只会在浏览器里调用 GitHub API 使用，不要写进源码、URL 或提交到仓库。
+        </p>
+      </div>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <div class="card-head">
+          <h2>GitHub 连接</h2>
+          <p>读取当前授信、验签和触发 workflow 都会用到这组配置。</p>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>仓库 Owner</span>
+            <input id="repoOwner" type="text" placeholder="linxingaifei">
+          </label>
+          <label>
+            <span>仓库 Name</span>
+            <input id="repoName" type="text" placeholder="ikguard-core">
+          </label>
+          <label>
+            <span>工作流分支</span>
+            <input id="repoRef" type="text" placeholder="main">
+          </label>
+          <label>
+            <span>工作流文件</span>
+            <input id="workflowFile" type="text" placeholder="license.yml">
+          </label>
+          <label>
+            <span>授权路径</span>
+            <input id="licensePath" type="text" placeholder="licenses/license.json">
+          </label>
+          <label>
+            <span>公钥路径</span>
+            <input id="publicKeyPath" type="text" placeholder="license/public_key.json">
+          </label>
+          <label class="wide">
+            <span>GitHub Token</span>
+            <input id="githubToken" type="password" placeholder="fine-grained PAT / GitHub App token">
+          </label>
+          <label class="inline">
+            <input id="rememberToken" type="checkbox">
+            <span>记住 token 到本地浏览器</span>
+          </label>
+        </div>
+        <div class="actions">
+          <button id="saveSettings" class="primary" type="button">保存配置</button>
+          <button id="loadLicense" type="button">读取授权</button>
+          <button id="verifyLicense" type="button">验签</button>
+          <button id="loadRuns" type="button">查看 Workflow</button>
+          <a id="openActions" class="link-btn" href="#" target="_blank" rel="noreferrer">打开 Actions</a>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <h2>签发授权</h2>
+          <p>点击后会调用 GitHub Actions 的 <code>workflow_dispatch</code>，由仓库里的私钥完成签发。</p>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>subject</span>
+            <input id="subject" type="text" placeholder="customer-a">
+          </label>
+          <label>
+            <span>owner</span>
+            <input id="licenseOwner" type="text" placeholder="linxingaifei">
+          </label>
+          <label>
+            <span>repo</span>
+            <input id="licenseRepo" type="text" placeholder="linxingaifei/ikguard-core">
+          </label>
+          <label>
+            <span>plugin</span>
+            <input id="pluginName" type="text" placeholder="ikguard">
+          </label>
+          <label>
+            <span>device</span>
+            <input id="deviceId" type="text" placeholder="">
+          </label>
+          <label>
+            <span>expires_in_days</span>
+            <input id="expiresInDays" type="number" min="1" step="1" value="90">
+          </label>
+          <label class="wide">
+            <span>features</span>
+            <input id="features" type="text" placeholder="scan,clean,validate">
+          </label>
+          <label class="wide">
+            <span>note</span>
+            <textarea id="note" rows="3" placeholder="Free-form note"></textarea>
+          </label>
+          <label class="wide">
+            <span>license_path</span>
+            <input id="dispatchLicensePath" type="text" placeholder="licenses/license.json">
+          </label>
+        </div>
+        <div class="actions">
+          <button id="dispatchWorkflow" class="primary" type="button">签发 / 更新</button>
+          <button id="copyLicenseJson" type="button">复制当前 JSON</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="grid lower">
+      <article class="card">
+        <div class="card-head">
+          <h2>当前授权</h2>
+          <p>浏览器会直接验证签章、到期时间与关联字段。</p>
+        </div>
+        <div class="summary">
+          <div><span>许可证 ID</span><strong id="licenseId">-</strong></div>
+          <div><span>到期时间</span><strong id="licenseExp">-</strong></div>
+          <div><span>授权对象</span><strong id="licenseSubject">-</strong></div>
+          <div><span>功能</span><strong id="licenseFeatures">-</strong></div>
+        </div>
+        <pre id="licensePreview" class="panel">尚未读取授权。</pre>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <h2>事件日志</h2>
+          <p>这里显示 API 请求、验证结果和 workflow 触发状态。</p>
+        </div>
+        <pre id="logPanel" class="panel"></pre>
+      </article>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
